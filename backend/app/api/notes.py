@@ -1,6 +1,7 @@
 from pathlib import Path
 from uuid import UUID
 import uuid
+import os
 
 from fastapi import APIRouter, Depends, HTTPException
 
@@ -14,8 +15,13 @@ router = APIRouter(prefix="/notes", tags=["notes"])
 # Base data dir: repository_root/data (we are in backend/)
 DATA_DIR = Path(__file__).resolve().parents[3] / "data"
 store = NotesStore(DATA_DIR)
-# Locks store with 5 minute default TTL
-locks = LocksStore(DATA_DIR, default_ttl_seconds=300)
+
+# # Locks store with 5 minute default TTL
+# locks = LocksStore(DATA_DIR, default_ttl_seconds=300)
+
+LOCK_TTL_SECONDS = int(os.getenv("LOCK_TTL_SECONDS", "300"))
+locks = LocksStore(DATA_DIR, default_ttl_seconds=LOCK_TTL_SECONDS)
+
 
 
 @router.post("", response_model=NoteOut, status_code=201)

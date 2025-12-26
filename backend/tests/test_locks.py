@@ -62,3 +62,44 @@ def test_lock_and_update_are_isolated_per_user():
         json={"title": "x", "content": "y", "lock_id": "00000000-0000-0000-0000-000000000000"},
     )
     assert r.status_code == 404
+
+def test_released_lock_cannot_be_reused():
+    r = client.post("/notes", headers={"X-User-Id": "userA"}, json={"title": "t", "content": "c"})
+    note_id = r.json()["id"]
+
+    r = client.post(f"/notes/{note_id}/lock", headers={"X-User-Id": "userA"})
+    lock_id = r.json()["lock_id"]
+
+    # release lock
+    r = client.delete(f"/notes/{note_id}/lock", headers={"X-User-Id": "userA"})
+    assert r.status_code == 204
+
+    # update with old lock_id must fail
+    r = client.put(
+        f"/notes/{note_id}",
+        headers={"X-User-Id": "userA"},
+        json={"title": "t2", "content": "c2", "lock_id": lock_id},
+    )
+    assert r.status_code == 409
+
+def test_wrong_lock_id_is_rejected():
+    r = client.post("/notes", headers={"X-User-Id": "userA"}, json={"title": "t", "content": "c"})
+    note_id = r.json()["id"]
+
+    r = client.post(f"/notes/{note_id}/lock", headers={"X-User-Id": "userA"})
+    assert r.status_code == 200
+
+    # use a random lock_id instead of the real one
+    r = client.put(
+        f"/notes/{note_id}",
+        headers={"X-User-Id": "userA"},
+        json={"title": "t2", "content": "c2", "lock_id": "11111111-1111-1111-1111-111111111111"},
+    )
+    assert r.status_code == 409
+
+def test_invalid_note_id_is_rejected_for_lock_routes():
+    r = client.post("/notes/not-a-uuid/lock", headers={"X-User-Id": "userA"})
+    assert r.status_code == 422
+
+    r = client.delete("/notes/not-a-uuid/lock", headers={"X-User-Id": "userA"})
+    assert r.status_code == 422
