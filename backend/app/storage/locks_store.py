@@ -56,9 +56,11 @@ class Lock:
 
 
 class LocksStore:
-    def __init__(self, base_dir: Path, default_ttl_seconds: int = 300):
+    def __init__(self, base_dir: Path, default_ttl_seconds: int = 300, event_log=None):
         self.base_dir = base_dir
         self.default_ttl_seconds = default_ttl_seconds
+        self.event_log = event_log
+
 
     def _is_expired(self, raw: dict[str, Any]) -> bool:
         return _utc_now() >= _parse_dt(raw["expires_at"])
@@ -108,6 +110,17 @@ class LocksStore:
                 p.unlink()
             except OSError:
                 pass
+
+            if self.event_log:
+                from app.storage.event_log import Event
+                self.event_log.emit(Event(
+                    event_type="LOCK_EXPIRED",
+                    user_id=user_id,
+                    note_id=str(note_id),
+                    lock_id=raw.get("lock_id"),
+                    meta={"expires_at": raw.get("expires_at")},
+                ))
+
             return False
 
         try:
@@ -127,6 +140,18 @@ class LocksStore:
                 p.unlink()
             except OSError:
                 pass
+
+            if self.event_log:
+                from app.storage.event_log import Event
+                self.event_log.emit(Event(
+                    event_type="LOCK_EXPIRED",
+                    user_id=user_id,
+                    note_id=str(note_id),
+                    lock_id=raw.get("lock_id"),
+                    meta={"expires_at": raw.get("expires_at")},
+                ))
+
             return False
+
 
         return raw.get("owner_user_id") == user_id and raw.get("lock_id") == str(lock_id)
