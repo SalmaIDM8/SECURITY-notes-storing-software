@@ -1,9 +1,9 @@
-from fastapi.testclient import TestClient
-from app.main import app
+# from fastapi.testclient import TestClient
+# from app.main import app
 
-client = TestClient(app)
+# client = TestClient(app)
 
-def test_note_access_is_isolated_per_user():
+def test_note_access_is_isolated_per_user(client):
     # userA creates a note
     r = client.post(
         "/notes",
@@ -23,7 +23,7 @@ def test_note_access_is_isolated_per_user():
     assert r.status_code == 404
 
 
-def test_invalid_note_id_is_rejected():
+def test_invalid_note_id_is_rejected(client):
     # malformed identifier is rejected before business logic
     r = client.get("/notes/not-a-uuid", headers={"X-User-Id": "userA"})
     assert r.status_code == 422

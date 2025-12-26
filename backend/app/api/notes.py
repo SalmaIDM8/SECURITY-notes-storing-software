@@ -13,8 +13,9 @@ from app.utils.auth_stub import get_user_id
 
 router = APIRouter(prefix="/notes", tags=["notes"])
 
-# Base data dir: repository_root/data (we are in backend/)
-DATA_DIR = Path(__file__).resolve().parents[3] / "data"
+# DATA_DIR config via env var
+DEFAULT_DATA_DIR = Path(__file__).resolve().parents[3] / "data"
+DATA_DIR = Path(os.getenv("APP_DATA_DIR", str(DEFAULT_DATA_DIR)))
 store = NotesStore(DATA_DIR)
 
 # TTL config (now via env)
