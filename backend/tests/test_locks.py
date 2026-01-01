@@ -1,12 +1,12 @@
-from fastapi.testclient import TestClient
-from app.main import app
+# from fastapi.testclient import TestClient
+# from app.main import app
 from app.storage.notes_store import _safe_user_dir, _note_path
 
 
-client = TestClient(app)
+# client = TestClient(app)
 
 
-def test_update_requires_lock():
+def test_update_requires_lock(client):
     # create note
     r = client.post(
         "/notes",
@@ -42,7 +42,7 @@ def test_update_requires_lock():
     assert updated["version"] == 2
 
 
-def test_lock_and_update_are_isolated_per_user():
+def test_lock_and_update_are_isolated_per_user(client):
     # userA creates
     r = client.post(
         "/notes",
@@ -63,7 +63,7 @@ def test_lock_and_update_are_isolated_per_user():
     )
     assert r.status_code == 404
 
-def test_released_lock_cannot_be_reused():
+def test_released_lock_cannot_be_reused(client):
     r = client.post("/notes", headers={"X-User-Id": "userA"}, json={"title": "t", "content": "c"})
     note_id = r.json()["id"]
 
@@ -82,7 +82,7 @@ def test_released_lock_cannot_be_reused():
     )
     assert r.status_code == 409
 
-def test_wrong_lock_id_is_rejected():
+def test_wrong_lock_id_is_rejected(client):
     r = client.post("/notes", headers={"X-User-Id": "userA"}, json={"title": "t", "content": "c"})
     note_id = r.json()["id"]
 
@@ -97,7 +97,7 @@ def test_wrong_lock_id_is_rejected():
     )
     assert r.status_code == 409
 
-def test_invalid_note_id_is_rejected_for_lock_routes():
+def test_invalid_note_id_is_rejected_for_lock_routes(client):
     r = client.post("/notes/not-a-uuid/lock", headers={"X-User-Id": "userA"})
     assert r.status_code == 422
 
