@@ -1,0 +1,30 @@
+﻿# Local Python virtualenvs
+.venv/
+venv/
+.env
+
+# Python caches / bytecode
+__pycache__/
+*.pyc
+
+# Test caches / coverage
+.pytest_cache/
+.coverage
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs and temporary artifacts
+*.log
+*.tmp
+
+# Local demo / debug artifacts (do not commit)
+raw_events.json
+events.json
+curl_headers.txt
+events_*.json
+
+# Editor folders
+.vscode/
+*.swp

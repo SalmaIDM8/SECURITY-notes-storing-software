@@ -138,3 +138,41 @@ class NotesStore:
             updated_at=raw["updated_at"],
             version=int(raw["version"]),
         )
+
+    def apply_note_raw(self, raw: dict[str, Any]) -> Note:
+        """
+        Apply a note payload received from replication. This writes the raw note representation
+        to the user's notes directory atomically and returns a Note instance.
+        The caller is responsible for version/conflict decisions.
+        """
+        # basic validation
+        if "id" not in raw or "owner_user_id" not in raw:
+            raise ValueError("Invalid note payload: missing id/owner_user_id")
+
+        note_id = uuid.UUID(raw["id"])
+        user_id = raw["owner_user_id"]
+
+        path = _note_path(self.base_dir, user_id, note_id)
+
+        # ensure required fields exist and normalize types
+        to_write = {
+            "id": str(note_id),
+            "owner_user_id": user_id,
+            "title": raw.get("title", ""),
+            "content": raw.get("content", ""),
+            "created_at": raw.get("created_at", _utc_now_iso()),
+            "updated_at": raw.get("updated_at", _utc_now_iso()),
+            "version": int(raw.get("version", 1)),
+        }
+
+        _atomic_write_json(path, to_write)
+
+        return Note(
+            id=note_id,
+            owner_user_id=user_id,
+            title=to_write["title"],
+            content=to_write["content"],
+            created_at=to_write["created_at"],
+            updated_at=to_write["updated_at"],
+            version=int(to_write["version"]),
+        )
