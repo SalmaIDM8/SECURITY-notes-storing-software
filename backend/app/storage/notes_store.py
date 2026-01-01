@@ -113,3 +113,28 @@ class NotesStore:
             updated_at=raw["updated_at"],
             version=int(raw["version"]),
         )
+
+    def update_note(self, user_id: str, note_id: uuid.UUID, title: str, content: str) -> Note | None:
+        path = _note_path(self.base_dir, user_id, note_id)
+        if not path.exists():
+            return None
+
+        raw = json.loads(path.read_text(encoding="utf-8"))
+        now = _utc_now_iso()
+
+        raw["title"] = title
+        raw["content"] = content
+        raw["updated_at"] = now
+        raw["version"] = int(raw.get("version", 1)) + 1
+
+        _atomic_write_json(path, raw)
+
+        return Note(
+            id=uuid.UUID(raw["id"]),
+            owner_user_id=raw["owner_user_id"],
+            title=raw["title"],
+            content=raw["content"],
+            created_at=raw["created_at"],
+            updated_at=raw["updated_at"],
+            version=int(raw["version"]),
+        )
