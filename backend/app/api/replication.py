@@ -4,6 +4,8 @@ import os
 from typing import List
 
 from fastapi import APIRouter, HTTPException, Request
+from fastapi import Request, Header, HTTPException, status
+from app.utils.replication_auth import verify_replication_token
 
 from app.storage.event_log import Event
 from app.storage.event_log import _events_path
@@ -77,13 +79,33 @@ def _ensure_replication_dir(base_dir: Path, user_id: str) -> Path:
 
 
 @router.post("/events")
-async def post_events(request: Request):
+async def post_events(
+    request: Request,
+    x_replication_token: str | None = Header(default=None, alias="X-Replication-Token"),
+):
     """
     Accept a batch of enriched events and apply them idempotently.
     Payload: JSON array of event objects (as returned by GET /replicate/events).
+    SECURITY: requires X-Replication-Token (HMAC) computed over raw request body.
     """
+
+    # ---- HMAC AUTH (server-to-server) ----
+    if not x_replication_token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing replication token",
+        )
+
+    raw_body = await request.body()
+    if not verify_replication_token(raw_body, x_replication_token):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid replication token",
+        )
+
+    # ---- Parse JSON only after auth passes ----
     try:
-        body = await request.json()
+        body = json.loads(raw_body.decode("utf-8"))
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid JSON")
 
@@ -101,7 +123,11 @@ async def post_events(request: Request):
         seen_file = rep_dir / "seen_events.txt"
         seen = set()
         if seen_file.exists():
-            seen = set(x.strip() for x in seen_file.read_text(encoding="utf-8").splitlines() if x.strip())
+            seen = set(
+                x.strip()
+                for x in seen_file.read_text(encoding="utf-8").splitlines()
+                if x.strip()
+            )
 
         if event_id in seen:
             continue
@@ -111,13 +137,10 @@ async def post_events(request: Request):
         if etype in ("NOTE_CREATED", "NOTE_UPDATED"):
             payload = e.get("payload") or {}
             try:
-                # decide apply semantics using versions: naive policy -> accept if incoming version > local
                 from uuid import UUID
+
                 nid = UUID(str(payload.get("id"))) if payload.get("id") else None
-                if nid is None:
-                    # nothing to apply
-                    pass
-                else:
+                if nid is not None:
                     existing = store.get_note(user_id=user_id, note_id=nid)
                     incoming_version = int(payload.get("version", 1))
                     if existing is None:
@@ -125,9 +148,6 @@ async def post_events(request: Request):
                     else:
                         if incoming_version > existing.version:
                             store.apply_note_raw(payload)
-                        else:
-                            # ignore older or equal versions
-                            pass
             except Exception:
                 # ignore apply failures for now; in production log + alert
                 pass
@@ -142,3 +162,4 @@ async def post_events(request: Request):
         applied += 1
 
     return {"applied": applied}
+

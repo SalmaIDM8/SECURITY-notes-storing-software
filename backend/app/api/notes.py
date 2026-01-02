@@ -9,7 +9,7 @@ from app.models.notes import NoteCreate, NoteOut, NoteUpdate
 from app.storage.notes_store import NotesStore
 from app.storage.locks_store import LocksStore
 from app.storage.event_log import EventLog, Event
-from app.utils.auth_stub import get_user_id
+from app.utils.jwt_auth import get_current_user
 
 router = APIRouter(prefix="/notes", tags=["notes"])
 
@@ -27,7 +27,7 @@ locks = LocksStore(DATA_DIR, default_ttl_seconds=LOCK_TTL_SECONDS, event_log=eve
 
 
 @router.post("", response_model=NoteOut, status_code=201)
-def create_note(payload: NoteCreate, user_id: str = Depends(get_user_id)) -> NoteOut:
+def create_note(payload: NoteCreate, user_id: str = Depends(get_current_user)) -> NoteOut:
     note = store.create_note(user_id=user_id, title=payload.title, content=payload.content)
 
     event_log.emit(Event(
@@ -41,13 +41,13 @@ def create_note(payload: NoteCreate, user_id: str = Depends(get_user_id)) -> Not
 
 
 @router.get("", response_model=list[NoteOut])
-def list_notes(user_id: str = Depends(get_user_id)) -> list[NoteOut]:
+def list_notes(user_id: str = Depends(get_current_user)) -> list[NoteOut]:
     notes = store.list_notes(user_id=user_id)
     return [NoteOut(**n.to_dict()) for n in notes]
 
 
 @router.get("/{note_id}", response_model=NoteOut)
-def get_note(note_id: UUID, user_id: str = Depends(get_user_id)) -> NoteOut:
+def get_note(note_id: UUID, user_id: str = Depends(get_current_user)) -> NoteOut:
     note = store.get_note(user_id=user_id, note_id=uuid.UUID(str(note_id)))
     if note is None:
         raise HTTPException(status_code=404, detail="Note not found")
@@ -56,7 +56,7 @@ def get_note(note_id: UUID, user_id: str = Depends(get_user_id)) -> NoteOut:
 
 # Day 3: Locking
 @router.post("/{note_id}/lock")
-def acquire_lock(note_id: UUID, user_id: str = Depends(get_user_id)) -> dict:
+def acquire_lock(note_id: UUID, user_id: str = Depends(get_current_user)) -> dict:
     nid = uuid.UUID(str(note_id))
     lock = locks.acquire_lock(user_id=user_id, note_id=nid)
     if lock is None:
@@ -75,7 +75,7 @@ def acquire_lock(note_id: UUID, user_id: str = Depends(get_user_id)) -> dict:
 
 # Day 4 stabilization: make DELETE idempotent (recommended)
 @router.delete("/{note_id}/lock", status_code=204)
-def release_lock(note_id: UUID, user_id: str = Depends(get_user_id)) -> None:
+def release_lock(note_id: UUID, user_id: str = Depends(get_current_user)) -> None:
     nid = uuid.UUID(str(note_id))
     locks.release_lock(user_id=user_id, note_id=nid)
 
@@ -90,7 +90,7 @@ def release_lock(note_id: UUID, user_id: str = Depends(get_user_id)) -> None:
 
 # Day 3: Update (requires lock)
 @router.put("/{note_id}", response_model=NoteOut)
-def update_note(note_id: UUID, payload: NoteUpdate, user_id: str = Depends(get_user_id)) -> NoteOut:
+def update_note(note_id: UUID, payload: NoteUpdate, user_id: str = Depends(get_current_user)) -> NoteOut:
     nid = uuid.UUID(str(note_id))
 
     existing = store.get_note(user_id=user_id, note_id=nid)
