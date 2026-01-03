@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Secure Notes</title>
+
+  <!-- Minimal CSP (keeps it safer). If you later add CDN libs, adjust. -->
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; base-uri 'self'; frame-ancestors 'none';" />
+
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">Secure Notes</div>
+    <div class="right">
+      <span id="whoami" class="muted"></span>
+      <button id="logoutBtn" class="ghost hidden">Logout</button>
+    </div>
+  </header>
+
+  <main class="container">
+    <!-- Auth -->
+    <section id="authView" class="card">
+      <h2>Login</h2>
+      <p class="muted">Use your account to access your notes. Passwords are hashed server-side.</p>
+
+      <div class="grid2">
+        <div>
+          <label>User ID</label>
+          <input id="userId" autocomplete="username" placeholder="e.g. userA" />
+        </div>
+        <div>
+          <label>Password</label>
+          <input id="password" type="password" autocomplete="current-password" placeholder="••••••••" />
+        </div>
+      </div>
+
+      <div class="row">
+        <button id="loginBtn">Login</button>
+        <button id="registerBtn" class="ghost">Register</button>
+      </div>
+
+      <div id="authMsg" class="msg"></div>
+    </section>
+
+    <!-- App -->
+    <section id="appView" class="hidden">
+      <div class="split">
+        <!-- Notes list -->
+        <section class="card">
+          <div class="row between">
+            <h2>Your notes</h2>
+            <button id="refreshBtn" class="ghost">Refresh</button>
+          </div>
+
+          <div class="row">
+            <input id="searchBox" placeholder="Search by title..." />
+            <button id="newNoteBtn">New</button>
+          </div>
+
+          <ul id="notesList" class="list"></ul>
+          <div class="muted small">Tip: select a note to view/edit. Updates require a lock.</div>
+        </section>
+
+        <!-- Editor + sharing -->
+        <section class="card">
+          <div class="row between">
+            <h2 id="editorTitle">Editor</h2>
+            <span id="lockState" class="pill muted">No lock</span>
+          </div>
+
+          <div class="grid2">
+            <div>
+              <label>Title</label>
+              <input id="noteTitle" placeholder="Title" />
+            </div>
+            <div>
+              <label>Version</label>
+              <input id="noteVersion" disabled />
+            </div>
+          </div>
+
+          <label>Content</label>
+          <textarea id="noteContent" rows="10" placeholder="Write your note..."></textarea>
+
+          <div class="row wrap">
+            <button id="acquireLockBtn" class="ghost">Acquire lock</button>
+            <button id="saveBtn">Save</button>
+            <button id="releaseLockBtn" class="ghost">Release lock</button>
+          </div>
+
+          <hr />
+
+          <h3>Share</h3>
+          <div class="grid2">
+            <div>
+              <label>Share with (user_id)</label>
+              <input id="shareWith" placeholder="e.g. userB" />
+            </div>
+            <div>
+              <label>Mode</label>
+              <select id="shareMode">
+                <option value="ro">Read-only</option>
+                <option value="rw">Read/Write (lock required)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="row wrap">
+            <button id="createShareBtn">Create share</button>
+            <button id="revokeShareBtn" class="ghost">Revoke share (owner)</button>
+          </div>
+
+          <div class="row">
+            <label class="muted small">Share ID</label>
+            <input id="shareId" placeholder="Paste share_id here..." />
+          </div>
+
+          <div class="row wrap">
+            <button id="openShareBtn" class="ghost">Open shared note</button>
+            <button id="shareLockBtn" class="ghost">Lock (shared RW)</button>
+            <button id="shareSaveBtn" class="ghost">Save (shared RW)</button>
+          </div>
+
+          <div id="appMsg" class="msg"></div>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>
