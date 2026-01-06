@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
+from uuid import UUID
 
 from app.storage.notes_store import _safe_user_dir, _note_path
 
@@ -42,6 +43,7 @@ class Lock:
     lock_id: uuid.UUID
     note_id: uuid.UUID
     owner_user_id: str
+    holder_id: str  # user_id OR "share:<share_id>"
     created_at: str
     expires_at: str
 
@@ -50,6 +52,7 @@ class Lock:
             "lock_id": str(self.lock_id),
             "note_id": str(self.note_id),
             "owner_user_id": self.owner_user_id,
+            "holder_id": self.holder_id,
             "created_at": self.created_at,
             "expires_at": self.expires_at,
         }
@@ -60,7 +63,6 @@ class LocksStore:
         self.base_dir = base_dir
         self.default_ttl_seconds = default_ttl_seconds
         self.event_log = event_log
-
 
     def _is_expired(self, raw: dict[str, Any]) -> bool:
         return _utc_now() >= _parse_dt(raw["expires_at"])
@@ -79,6 +81,7 @@ class LocksStore:
                     lock_id=uuid.UUID(raw["lock_id"]),
                     note_id=uuid.UUID(raw["note_id"]),
                     owner_user_id=raw["owner_user_id"],
+                    holder_id=raw.get("holder_id") or raw.get("owner_user_id"),  # legacy fallback
                     created_at=raw["created_at"],
                     expires_at=raw["expires_at"],
                 )
@@ -89,6 +92,7 @@ class LocksStore:
             lock_id=uuid.uuid4(),
             note_id=note_id,
             owner_user_id=user_id,
+            holder_id=user_id,
             created_at=now.isoformat(),
             expires_at=(now + timedelta(seconds=self.default_ttl_seconds)).isoformat(),
         )
@@ -113,14 +117,15 @@ class LocksStore:
 
             if self.event_log:
                 from app.storage.event_log import Event
-                self.event_log.emit(Event(
-                    event_type="LOCK_EXPIRED",
-                    user_id=user_id,
-                    note_id=str(note_id),
-                    lock_id=raw.get("lock_id"),
-                    meta={"expires_at": raw.get("expires_at")},
-                ))
-
+                self.event_log.emit(
+                    Event(
+                        event_type="LOCK_EXPIRED",
+                        user_id=user_id,
+                        note_id=str(note_id),
+                        lock_id=raw.get("lock_id"),
+                        meta={"expires_at": raw.get("expires_at")},
+                    )
+                )
             return False
 
         try:
@@ -143,15 +148,80 @@ class LocksStore:
 
             if self.event_log:
                 from app.storage.event_log import Event
-                self.event_log.emit(Event(
-                    event_type="LOCK_EXPIRED",
-                    user_id=user_id,
-                    note_id=str(note_id),
-                    lock_id=raw.get("lock_id"),
-                    meta={"expires_at": raw.get("expires_at")},
-                ))
-
+                self.event_log.emit(
+                    Event(
+                        event_type="LOCK_EXPIRED",
+                        user_id=user_id,
+                        note_id=str(note_id),
+                        lock_id=raw.get("lock_id"),
+                        meta={"expires_at": raw.get("expires_at")},
+                    )
+                )
             return False
 
+        holder = raw.get("holder_id") or raw.get("owner_user_id")  # legacy fallback
+        return holder == user_id and raw.get("lock_id") == str(lock_id)
 
-        return raw.get("owner_user_id") == user_id and raw.get("lock_id") == str(lock_id)
+    # ==========================================================
+    # Share-specific locking (RW shares): holder_id="share:<id>"
+    # ==========================================================
+
+    def acquire_lock_for_share(self, note_owner_user_id: str, note_id: UUID, share_id: UUID) -> dict[str, Any] | None:
+        """
+        Acquire a lock on an OWNER's note, but held by a share token (share:<share_id>).
+        Stored under the owner's locks directory (same as normal locks).
+        """
+        if not _note_path(self.base_dir, note_owner_user_id, note_id).exists():
+            return None
+
+        p = _lock_path(self.base_dir, note_owner_user_id, note_id)
+        if p.exists():
+            try:
+                raw = json.loads(p.read_text(encoding="utf-8"))
+                if not self._is_expired(raw):
+                    return raw
+            except Exception:
+                pass
+
+        now = _utc_now()
+        data = {
+            "lock_id": str(uuid.uuid4()),
+            "note_id": str(note_id),
+            "owner_user_id": note_owner_user_id,
+            "holder_id": f"share:{share_id}",
+            "created_at": now.isoformat(),
+            "expires_at": (now + timedelta(seconds=self.default_ttl_seconds)).isoformat(),
+        }
+        _atomic_write_json(p, data)
+        return data
+
+    def require_valid_lock_for_share(
+        self,
+        note_owner_user_id: str,
+        note_id: UUID,
+        share_id: UUID,
+        lock_id: UUID,
+    ) -> bool:
+        """
+        Validate that a lock exists for the OWNER's note and is held by this share.
+        """
+        p = _lock_path(self.base_dir, note_owner_user_id, note_id)
+        if not p.exists():
+            return False
+
+        try:
+            raw = json.loads(p.read_text(encoding="utf-8"))
+        except Exception:
+            return False
+
+        if self._is_expired(raw):
+            try:
+                p.unlink()
+            except OSError:
+                pass
+            return False
+
+        if raw.get("lock_id") != str(lock_id):
+            return False
+
+        return raw.get("holder_id") == f"share:{share_id}"
