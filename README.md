@@ -110,6 +110,7 @@ Create a `.env` file in `backend/`:
 ```env
 JWT_SECRET=change-me-to-a-long-random-secret
 CORS_ALLOW_ORIGINS=http://127.0.0.1:5173,http://localhost:5173
+```
 
 > Do not commit `.env` (add `backend/.env` to `.gitignore`).
 
@@ -118,12 +119,14 @@ From `backend/`:
 
 ```bash
 uvicorn app.main:app --reload --port 8000
+```
 
 ### Sanity check
 
 ```bash
 curl http://127.0.0.1:8000/health
 # {"ok": true}
+```
 
 ### Start the frontend:
 From the frontend folder:
