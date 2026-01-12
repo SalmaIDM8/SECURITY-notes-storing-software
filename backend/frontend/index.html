@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Secure Notes</title>
+
+  <!-- Tight CSP for this static app (no CDN). -->
+  <meta http-equiv="Content-Security-Policy"
+    content="
+      default-src 'self';
+      script-src 'self';
+      style-src 'self';
+      connect-src 'self' http://127.0.0.1:8000;
+      base-uri 'none';
+      object-src 'none';
+      frame-ancestors 'none';
+      form-action 'self';
+    ">
+
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">Secure Notes</div>
+    <div class="right">
+      <span id="whoami" class="muted"></span>
+      <button id="logoutBtn" class="ghost hidden" type="button">Logout</button>
+    </div>
+  </header>
+
+  <main class="container">
+    <!-- Auth -->
+    <section id="authView" class="card" aria-labelledby="authTitle">
+      <h2 id="authTitle">Login</h2>
+      <p class="muted">Use your account to access your notes. Passwords are hashed server-side.</p>
+
+      <div class="grid2">
+        <div>
+          <label for="userId">User ID</label>
+          <input id="userId" autocomplete="username" placeholder="e.g. userA" />
+        </div>
+        <div>
+          <label for="password">Password</label>
+          <input id="password" type="password" autocomplete="current-password" placeholder="••••••••" />
+        </div>
+      </div>
+
+      <div class="row">
+        <button id="loginBtn" type="button">Login</button>
+        <button id="registerBtn" class="ghost" type="button">Register</button>
+      </div>
+
+      <div id="authMsg" class="msg" role="status" aria-live="polite"></div>
+    </section>
+
+    <!-- App -->
+    <section id="appView" class="hidden">
+      <div class="split">
+        <!-- Notes list -->
+        <section class="card" aria-labelledby="notesTitle">
+          <div class="row between">
+            <h2 id="notesTitle">Your notes</h2>
+            <button id="refreshBtn" class="ghost" type="button">Refresh</button>
+          </div>
+
+          <div class="row">
+            <input id="searchBox" placeholder="Search by title..." />
+            <button id="newNoteBtn" type="button">New</button>
+          </div>
+
+          <ul id="notesList" class="list"></ul>
+          <div class="muted small">Tip: select a note to view/edit. Updates require a lock.</div>
+        </section>
+
+        <!-- Editor + sharing -->
+        <section class="card" aria-labelledby="editorHeading">
+          <div class="row between">
+            <h2 id="editorHeading"><span id="editorTitle">Editor</span></h2>
+            <span id="lockState" class="pill muted">No lock</span>
+          </div>
+
+          <div class="grid2">
+            <div>
+              <label for="noteTitle">Title</label>
+              <input id="noteTitle" placeholder="Title" />
+            </div>
+            <div>
+              <label for="noteVersion">Version</label>
+              <input id="noteVersion" disabled />
+            </div>
+          </div>
+
+          <label for="noteContent">Content</label>
+          <textarea id="noteContent" rows="10" placeholder="Write your note..."></textarea>
+
+          <div class="row wrap">
+            <button id="acquireLockBtn" class="ghost" type="button">Acquire lock</button>
+            <button id="saveBtn" type="button">Save</button>
+            <button id="releaseLockBtn" class="ghost" type="button">Release lock</button>
+          </div>
+
+          <hr />
+
+          <h3>Share</h3>
+          <div class="grid2">
+            <div>
+              <label for="shareWith">Share with (user_id)</label>
+              <input id="shareWith" placeholder="e.g. userB" />
+            </div>
+            <div>
+              <label for="shareMode">Mode</label>
+              <select id="shareMode">
+                <option value="ro">Read-only</option>
+                <option value="rw">Read/Write (lock required)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="row wrap">
+            <button id="createShareBtn" type="button">Create share</button>
+            <button id="revokeShareBtn" class="ghost" type="button">Revoke share (owner)</button>
+          </div>
+
+          <div class="row">
+            <label class="muted small" for="shareId">Share ID</label>
+            <input id="shareId" placeholder="Paste share_id here..." />
+          </div>
+
+          <div class="row wrap">
+            <button id="openShareBtn" class="ghost" type="button">Open shared note</button>
+            <button id="shareLockBtn" class="ghost" type="button">Lock (shared RW)</button>
+            <button id="shareSaveBtn" class="ghost" type="button">Save (shared RW)</button>
+          </div>
+
+          <div id="appMsg" class="msg" role="status" aria-live="polite"></div>
+
+          <div class="muted small" style="margin-top:10px">
+            Security note: this UI does not persist tokens in storage. You may need to login again after refresh.
+          </div>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <script src="./app.js" defer></script>
+</body>
+</html>

@@ -4,7 +4,7 @@ import os
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from fastapi import Depends, HTTPException, status, Header
+from fastapi import Depends, HTTPException, status, Header, Cookie
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 
@@ -43,13 +43,16 @@ def decode_token(token: str) -> dict:
 
 def get_current_user(
     creds: Optional[HTTPAuthorizationCredentials] = Depends(bearer),
+    access_token: str | None = Cookie(default=None),
     x_user_id: str | None = Header(default=None, alias="X-User-Id"),
 ) -> str:
     """
-    FINAL behavior:
-    - Prefer JWT (Authorization: Bearer ...)
-    - Fallback to X-User-Id (compatibility with existing tests/demo)
+    Security behavior:
+    - Prefer Authorization: Bearer <jwt>
+    - Fallback to cookie "access_token" (HttpOnly flow)
+    - Fallback to X-User-Id (legacy tests/demo)
     """
+    # 1) Authorization header wins
     if creds is not None and creds.scheme.lower() == "bearer":
         try:
             payload = decode_token(creds.credentials)
@@ -60,7 +63,18 @@ def get_current_user(
         except JWTError:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
 
-    # fallback (tests + demo)
+    # 2) Cookie auth
+    if access_token:
+        try:
+            payload = decode_token(access_token)
+            sub = payload.get("sub")
+            if not sub:
+                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+            return str(sub)
+        except JWTError:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
+
+    # 3) Legacy fallback
     if x_user_id:
         return x_user_id
 
