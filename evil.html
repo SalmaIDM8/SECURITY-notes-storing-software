@@ -1,0 +1,27 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>Evil front</title></head>
+<body>
+  <h1>Evil Front-End</h1>
+  <button id="steal">Try to read notes</button>
+  <pre id="out"></pre>
+
+  <script>
+    const out = document.getElementById("out");
+
+    document.getElementById("steal").onclick = async () => {
+      out.textContent = "Sending request...\n";
+      try {
+        const r = await fetch("http://127.0.0.1:8000/notes", {
+          method: "GET",
+          credentials: "include", // tries to use victim cookies
+        });
+        out.textContent += "HTTP " + r.status + "\n";
+        out.textContent += await r.text();
+      } catch (e) {
+        out.textContent += "Blocked by browser: " + e + "\n";
+      }
+    };
+  </script>
+</body>
+</html>
