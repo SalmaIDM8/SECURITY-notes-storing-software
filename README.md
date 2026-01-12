@@ -100,44 +100,127 @@ Two complementary test suites validate the Security Machine against the identifi
 
 ## How to Run
 
+This project is developed and tested primarily on Windows (PowerShell). The instructions below show a reliable, repeatable way to start the backend and frontend for development and for manual security testing (AR scenarios).
+
 ### Prerequisites
-- Python 3.x
-- Virtual environment activated
+- Python 3.10+ installed and on PATH
+- Git
+- (Optional, for frontend) Node.js 18+ and npm
 
-### Backend configuration (`backend/.env`)
-Create a `.env` file in `backend/`:
+### Backend — quick start (recommended)
+1. Open PowerShell, change to the `backend` folder and create/activate a virtual environment:
 
-```env
-JWT_SECRET=change-me-to-a-long-random-secret
+```powershell
+cd backend
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+```
+
+2. Install Python dependencies (use the provided `requirements.txt`):
+
+```powershell
+python -m pip install --upgrade pip setuptools wheel
+python -m pip install -r requirements.txt
+# If you see a ModuleNotFoundError for dotenv, install it explicitly:
+python -m pip install python-dotenv
+```
+
+3. Create `backend/.env` (example values are placeholders — replace secrets for realistic testing):
+
+```ini
+JWT_SECRET=replace-with-a-long-random-secret
+REPL_SECRET=replace-with-repl-secret
 CORS_ALLOW_ORIGINS=http://127.0.0.1:5173,http://localhost:5173
+COOKIE_SECURE=0
 ```
 
-> Do not commit `.env` (add `backend/.env` to `.gitignore`).
+4. Start the backend using the helper script (it loads `.env` and starts uvicorn):
 
-### Start the backend (FastAPI)
-From `backend/`:
-
-```bash
-uvicorn app.main:app --reload --port 8000
+```powershell
+# ensure venv is active
+.\.venv\Scripts\Activate.ps1
+.\start-dev.ps1
 ```
 
-### Sanity check
+The script sets the variables in the current session and launches `uvicorn app.main:app --reload --host 127.0.0.1 --port 8000`.
 
-```bash
-curl http://127.0.0.1:8000/health
-# {"ok": true}
+5. Quick health check (PowerShell):
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:8000/health
+# expected: {"ok": true}
 ```
 
-### Start the frontend:
-From the frontend folder:
- ```bash
+If you need to set an environment variable just for the current session use:
+
+```powershell
+$env:JWT_SECRET = "your-secret"
+# then start uvicorn manually if not using start-dev.ps1
+uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+```
+
+To persist a variable across new terminals use `setx` (requires reopening terminals):
+
+```powershell
+setx JWT_SECRET "your-secret"
+```
+
+### Backend — common troubleshooting
+- If you see `ModuleNotFoundError: No module named 'dotenv'`, install `python-dotenv` in the venv as shown above.
+- If you see a `passlib`/`bcrypt` warning, installing `bcrypt` will remove it:
+
+```powershell
+python -m pip install bcrypt
+# If building bcrypt fails on Windows, either install the Microsoft C++ Build Tools or allow passlib to fall back to pbkdf2_sha256 (safe for tests).
+```
+
+### Frontend — serve the UI
+There are two common ways to serve the frontend. If you have a `package.json` and a Vite setup, use the dev server. If you don't (or you prefer a minimal static server), use Python's `http.server` — this is sufficient for manual testing and AR-4 reproduction.
+
+Option A — Static (works without Node / package.json) — recommended for testing:
+
+```powershell
+# from the repository root or the frontend folder
+cd frontend
+# serve the current folder at port 5173
 python -m http.server 5173
+# open http://127.0.0.1:5173/
 ```
 
-Open:
-```bash
-http://127.0.0.1:5173/
+
+Note: Vite proxies API requests for `/auth`, `/notes`, and `/api` to `http://127.0.0.1:8000` by default; keep the backend running on port 8000.
+
+### Running tests
+From the project root (with backend venv active):
+
+```powershell
+backend\.venv\Scripts\python.exe -m pytest -q
 ```
+
+Notes: `backend/tests/conftest.py` configures test-time env vars (`JWT_SECRET`, `REPL_SECRET`, `APP_DATA_DIR`) so tests run isolated and usually don't need manual `.env` setup.
+
+### Example API quick actions (PowerShell)
+Register a user:
+
+```powershell
+Invoke-RestMethod -Method POST -Uri http://127.0.0.1:8000/auth/register -ContentType 'application/json' -Body '{"user_id":"userA","password":"password123"}'
+```
+
+Login (token):
+
+```powershell
+Invoke-RestMethod -Method POST -Uri http://127.0.0.1:8000/auth/login -ContentType 'application/json' -Body '{"user_id":"userA","password":"password123"}'
+```
+
+Login (cookie mode, useful for AR-4 checks):
+
+```powershell
+# Use curl if you want to inspect headers; PowerShell's Invoke-RestMethod hides Set-Cookie
+curl -i -X POST http://127.0.0.1:8000/auth/login_cookie -H "Content-Type: application/json" -d '{"user_id":"userA","password":"password123"}'
+```
+
+The cookie-based login sets an `HttpOnly` cookie with `SameSite=Strict` by design.
+
 
 
 ## Create a Test User (API)
