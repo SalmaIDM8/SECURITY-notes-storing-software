@@ -134,15 +134,31 @@ CORS_ALLOW_ORIGINS=http://127.0.0.1:5173,http://localhost:5173
 COOKIE_SECURE=0
 ```
 
-4. Start the backend using the helper script (it loads `.env` and starts uvicorn):
+### Start helper: `start-dev.ps1` 
+
+The helper script `start-dev.ps1` is located at `backend\start-dev.ps1`.
+
+What it does:
+- Loads `backend/.env` into the current PowerShell session (using the Env: provider),
+- Prints which variables were set,
+- Starts the uvicorn dev server (`uvicorn app.main:app --reload --host 127.0.0.1 --port 8000`).
+
+You can run it from the `backend` folder (recommended):
 
 ```powershell
-# ensure venv is active
+# from backend\
 .\.venv\Scripts\Activate.ps1
 .\start-dev.ps1
 ```
 
-The script sets the variables in the current session and launches `uvicorn app.main:app --reload --host 127.0.0.1 --port 8000`.
+
+If you prefer to start the server manually without the helper, set the env vars in your session then start uvicorn:
+
+```powershell
+$env:JWT_SECRET = "your-secret"
+$env:REPL_SECRET = "your-repl-secret"
+uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+```
 
 5. Quick health check (PowerShell):
 
@@ -175,9 +191,6 @@ python -m pip install bcrypt
 ```
 
 ### Frontend — serve the UI
-There are two common ways to serve the frontend. If you have a `package.json` and a Vite setup, use the dev server. If you don't (or you prefer a minimal static server), use Python's `http.server` — this is sufficient for manual testing and AR-4 reproduction.
-
-Option A — Static (works without Node / package.json) — recommended for testing:
 
 ```powershell
 # from the repository root or the frontend folder
@@ -187,14 +200,16 @@ python -m http.server 5173
 # open http://127.0.0.1:5173/
 ```
 
-
-Note: Vite proxies API requests for `/auth`, `/notes`, and `/api` to `http://127.0.0.1:8000` by default; keep the backend running on port 8000.
-
 ### Running tests
 From the project root (with backend venv active):
 
 ```powershell
 backend\.venv\Scripts\python.exe -m pytest -q
+```
+To run only the anti requirements tests:
+
+```powershell
+backend\.venv\Scripts\python.exe -m pytest backend/tests/test_anti_requirements.py -q
 ```
 
 Notes: `backend/tests/conftest.py` configures test-time env vars (`JWT_SECRET`, `REPL_SECRET`, `APP_DATA_DIR`) so tests run isolated and usually don't need manual `.env` setup.
