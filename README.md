@@ -6,6 +6,12 @@
 
 This repository contains a secure replicated note storage system (REST API + file-based storage + web front-end) and a security requirements analysis using **Abuse Frames** (Lin et al., 2003). The implementation is validated through automated security tests and reproducible browser demonstrations.
 
+## Security Analysis
+
+This project includes a full security analysis using the Abuse Frames methodology, covering threat modeling, anti-requirements, and security validation tests.
+
+📄 Full report: [Security Analysis Report](security-analysis-report.pdf)
+
 ---
 
 ## Project Context
